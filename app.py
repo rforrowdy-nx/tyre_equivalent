@@ -19,8 +19,8 @@ except Exception as e:
     st.stop()
 
 # Top Control & Summary Panel
-col1, col2 = st.columns([2, 5])
-with col1:
+control_col1, control_col2, control_col3, control_col4 = st.columns([2, 2, 2, 4])
+with control_col1:
     builder_mode = st.selectbox("Builder Mode", ["2 Builder", "1 Builder"])
 
 multiplier = 0.5 if builder_mode == "1 Builder" else 1.0
@@ -40,7 +40,7 @@ hcol5.markdown("**Time (Minutes) (F)**")
 total_tyres = 0.0
 total_mins = 0.0
 
-# Render rows dynamically
+# Render rows dynamically using number inputs for instant live updates
 for idx, row in df.iterrows():
     gt_code = str(row['GT Code']) if pd.notna(row['GT Code']) else ""
     tyre_size = str(row['Tyre size'])
@@ -56,27 +56,26 @@ for idx, row in df.iterrows():
     t_key = f"tyre_{idx}"
     m_key = f"min_{idx}"
     
-    tyre_val = rcol4.text_input("", key=t_key, label_visibility="collapsed")
-    min_val = rcol5.text_input("", key=m_key, label_visibility="collapsed")
+    # Using number_input with step=None to look clean and update instantly
+    tyre_val = rcol4.number_input("", min_value=0.0, value=0.0, step=None, key=t_key, label_visibility="collapsed")
+    min_val = rcol5.number_input("", min_value=0.0, value=0.0, step=None, key=m_key, label_visibility="collapsed")
     
-    try:
-        if tyre_val.strip() != "":
-            t = float(tyre_val)
-            total_tyres += t
-            m = round((target_time / current_d) * t, 2)
-            total_mins += m
-        elif min_val.strip() != "":
-            m = float(min_val)
-            total_mins += m
-            t = round((m * current_d) / target_time, 2)
-            total_tyres += t
-    except ValueError:
-        pass
+    # Calculation logic
+    if tyre_val > 0:
+        t = float(tyre_val)
+        total_tyres += t
+        m = round((target_time / current_d) * t, 2)
+        total_mins += m
+    elif min_val > 0:
+        m = float(min_val)
+        total_mins += m
+        t = round((m * current_d) / target_time, 2)
+        total_tyres += t
 
-# Live Summary Panel
+# Live Summary Panel at Top / Bottom
 st.markdown("---")
 diff_val = target_time - total_mins
 summary_cols = st.columns(3)
 summary_cols[0].metric("Total Tyres Made", f"{total_tyres:.2f}")
-summary_cols[1].metric("Total Minutes", f"{total_mins:.2f}")
+summary_cols[1].metric("Total Minutes", f"{total_mins.2f}")
 summary_cols[2].markdown(f"### Target Diff: <span style='color:red'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</span>", unsafe_allow_html=True)
