@@ -18,31 +18,25 @@ except Exception as e:
     st.error(f"Error loading Excel file (Make sure 'Tyre Equalent Formula.xlsx' is uploaded to GitHub): {e}")
     st.stop()
 
-# Top Control Panel
-control_col1, control_col2 = st.columns([2, 5])
-with control_col1:
-    builder_mode = st.selectbox("Builder Mode", ["2 Builder", "1 Builder"])
-
-multiplier = 0.5 if builder_mode == "1 Builder" else 1.0
-target_time = 450.0 if builder_mode == "1 Builder" else 480.0
-header_d_label = "1 Builder (D)" if builder_mode == "1 Builder" else "2 Builder (D)"
-
-st.markdown("---")
-
-# Table Headers
-hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([1.5, 4, 2, 2, 2])
-hcol1.markdown("**GT Code**")
-hcol2.markdown("**Tyre Size**")
-hcol3.markdown(f"**{header_d_label}**")
-hcol4.markdown("**No. of Tyres (E)**")
-hcol5.markdown("**Time (Minutes) (F)**")
-
 # Initialize Session State values for rows if not already present
 for idx in range(len(df)):
     if f"t_{idx}" not in st.session_state:
         st.session_state[f"t_{idx}"] = 0.0
     if f"m_{idx}" not in st.session_state:
         st.session_state[f"m_{idx}"] = 0.0
+
+# Top Control Panel & Summary Display Container
+top_container = st.container()
+
+with top_container:
+    control_col1, separator, col_t, col_m, col_diff = st.columns([2, 0.5, 2, 2, 3])
+    
+    with control_col1:
+        builder_mode = st.selectbox("Builder Mode", ["2 Builder", "1 Builder"])
+
+    multiplier = 0.5 if builder_mode == "1 Builder" else 1.0
+    target_time = 450.0 if builder_mode == "1 Builder" else 480.0
+    header_d_label = "1 Builder (D)" if builder_mode == "1 Builder" else "2 Builder (D)"
 
 # Callbacks for 2-way live sync
 def update_from_tyre(idx, current_d, target_time):
@@ -58,6 +52,16 @@ def update_from_min(idx, current_d, target_time):
         st.session_state[f"t_{idx}"] = round((m * current_d) / target_time, 2)
     else:
         st.session_state[f"t_{idx}"] = 0.0
+
+st.markdown("---")
+
+# Table Headers
+hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([1.5, 4, 2, 2, 2])
+hcol1.markdown("**GT Code**")
+hcol2.markdown("**Tyre Size**")
+hcol3.markdown(f"**{header_d_label}**")
+hcol4.markdown("**No. of Tyres (E)**")
+hcol5.markdown("**Time (Minutes) (F)**")
 
 total_tyres = 0.0
 total_mins = 0.0
@@ -87,10 +91,11 @@ for idx, row in df.iterrows():
     total_tyres += st.session_state[t_key]
     total_mins += st.session_state[m_key]
 
-# Live Summary Panel
-st.markdown("---")
+# Render summary stats dynamically back into the top control panel columns
 diff_val = target_time - total_mins
-summary_cols = st.columns(3)
-summary_cols[0].metric("Total Tyres Made", f"{total_tyres:.2f}")
-summary_cols[1].metric("Total Minutes", f"{total_mins:.2f}")
-summary_cols[2].markdown(f"### Target Diff: <span style='color:red'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</span>", unsafe_allow_html=True)
+with col_t:
+    st.metric("Total Tyres", f"{total_tyres:.2f}")
+with col_m:
+    st.metric("Total Mins", f"{total_mins:.2f}")
+with col_diff:
+    st.markdown(f"<p style='font-size:16 font-weight:bold; color:red; padding-top:20px;'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</p>", unsafe_allow_html=True)
