@@ -15,7 +15,7 @@ def load_data():
 try:
     df = load_data()
 except Exception as e:
-    st.error(f"Error loading Excel file: {e}")
+    st.error(f"Error loading Excel file (Make sure 'Tyre Equalent Formula.xlsx' is uploaded to GitHub): {e}")
     st.stop()
 
 # Top Control Panel
@@ -37,41 +37,32 @@ hcol3.markdown(f"**{header_d_label}**")
 hcol4.markdown("**No. of Tyres (E)**")
 hcol5.markdown("**Time (Minutes) (F)**")
 
+# Initialize Session State values for rows if not already present
+for idx in range(len(df)):
+    if f"t_{idx}" not in st.session_state:
+        st.session_state[f"t_{idx}"] = 0.0
+    if f"m_{idx}" not in st.session_state:
+        st.session_state[f"m_{idx}"] = 0.0
+
+# Callbacks for 2-way live sync
+def update_from_tyre(idx, current_d, target_time):
+    t = st.session_state[f"t_{idx}"]
+    if t > 0:
+        st.session_state[f"m_{idx}"] = round((target_time / current_d) * t, 2)
+    else:
+        st.session_state[f"m_{idx}"] = 0.0
+
+def update_from_min(idx, current_d, target_time):
+    m = st.session_state[f"m_{idx}"]
+    if m > 0:
+        st.session_state[f"t_{idx}"] = round((m * current_d) / target_time, 2)
+    else:
+        st.session_state[f"t_{idx}"] = 0.0
+
 total_tyres = 0.0
 total_mins = 0.0
 
-# Initialize session state for tracking inputs if not present
-if 'tyre_vals' not in st.session_state:
-    st.session_state.tyre_vals = {i: 0.0 for i in range(len(df))}
-if 'min_vals' not in st.session_state:
-    st.session_state.min_vals = {i: 0.0 for i in range(len(df))}
-if 'last_edited' not in st.session_state:
-    st.session_state.last_edited = {i: 'tyre' for i in range(len(df))}
-
-# Callbacks for two-way synchronization
-def make_tyre_callback(idx, current_d, target_time):
-    def callback():
-        val = st.session_state[f"tyre_{idx}"]
-        st.session_state.last_edited[idx] = 'tyre'
-        st.session_state.tyre_vals[idx] = val
-        if val > 0:
-            st.session_state.min_vals[idx] = round((target_time / current_d) * val, 2)
-        else:
-            st.session_state.min_vals[idx] = 0.0
-    return callback
-
-def make_min_callback(idx, current_d, target_time):
-    def callback():
-        val = st.session_state[f"min_{idx}"]
-        st.session_state.last_edited[idx] = 'min'
-        st.session_state.min_vals[idx] = val
-        if val > 0:
-            st.session_state.tyre_vals[idx] = round((val * current_d) / target_time, 2)
-        else:
-            st.session_state.tyre_vals[idx] = 0.0
-    return callback
-
-# Render rows dynamically with 2-way session state sync
+# Render rows dynamically
 for idx, row in df.iterrows():
     gt_code = str(row['GT Code']) if pd.notna(row['GT Code']) else ""
     tyre_size = str(row['Tyre size'])
@@ -84,27 +75,17 @@ for idx, row in df.iterrows():
     rcol2.write(tyre_size)
     rcol3.write(f"{current_d:.2f}")
     
-    t_key = f"tyre_{idx}"
-    m_key = f"min_{idx}"
+    t_key = f"t_{idx}"
+    m_key = f"m_{idx}"
     
-    # Ensure session state values match current multiplier/target changes
-    if st.session_state.last_edited.get(idx) == 'tyre':
-        t_val = st.session_state.tyre_vals.get(idx, 0.0)
-        m_val = round((target_time / current_d) * t_val, 2) if t_val > 0 else 0.0
-        st.session_state.min_vals[idx] = m_val
-    else:
-        m_val = st.session_state.min_vals.get(idx, 0.0)
-        t_val = round((m_val * current_d) / target_time, 2) if m_val > 0 else 0.0
-        st.session_state.tyre_vals[idx] = t_val
-
-    # Widget inputs bound with callbacks
-    rcol4.number_input("", min_value=0.0, value=st.session_state.tyre_vals[idx], step=None, key=t_key, 
-                       label_visibility="collapsed", on_change=make_tyre_callback(idx, current_d, target_time))
-    rcol5.number_input("", min_value=0.0, value=st.session_state.min_vals[idx], step=None, key=m_key, 
-                       label_visibility="collapsed", on_change=make_min_callback(idx, current_d, target_time))
+    # Number inputs with event callbacks
+    rcol4.number_input("", min_value=0.0, step=None, key=t_key, label_visibility="collapsed",
+                       on_change=update_from_tyre, args=(idx, current_d, target_time))
+    rcol5.number_input("", min_value=0.0, step=None, key=m_key, label_visibility="collapsed",
+                       on_change=update_from_min, args=(idx, current_d, target_time))
     
-    total_tyres += st.session_state.tyre_vals[idx]
-    total_mins += st.session_state.min_vals[idx]
+    total_tyres += st.session_state[t_key]
+    total_mins += st.session_state[m_key]
 
 # Live Summary Panel
 st.markdown("---")
