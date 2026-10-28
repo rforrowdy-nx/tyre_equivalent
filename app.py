@@ -18,8 +18,8 @@ except Exception as e:
     st.error(f"Error loading Excel file: {e}")
     st.stop()
 
-# Top Control & Summary Panel
-control_col1, control_col2, control_col3, control_col4 = st.columns([2, 2, 2, 4])
+# Top Control Panel
+control_col1, control_col2 = st.columns([2, 5])
 with control_col1:
     builder_mode = st.selectbox("Builder Mode", ["2 Builder", "1 Builder"])
 
@@ -40,7 +40,38 @@ hcol5.markdown("**Time (Minutes) (F)**")
 total_tyres = 0.0
 total_mins = 0.0
 
-# Render rows dynamically using number inputs for instant live updates
+# Initialize session state for tracking inputs if not present
+if 'tyre_vals' not in st.session_state:
+    st.session_state.tyre_vals = {i: 0.0 for i in range(len(df))}
+if 'min_vals' not in st.session_state:
+    st.session_state.min_vals = {i: 0.0 for i in range(len(df))}
+if 'last_edited' not in st.session_state:
+    st.session_state.last_edited = {i: 'tyre' for i in range(len(df))}
+
+# Callbacks for two-way synchronization
+def make_tyre_callback(idx, current_d, target_time):
+    def callback():
+        val = st.session_state[f"tyre_{idx}"]
+        st.session_state.last_edited[idx] = 'tyre'
+        st.session_state.tyre_vals[idx] = val
+        if val > 0:
+            st.session_state.min_vals[idx] = round((target_time / current_d) * val, 2)
+        else:
+            st.session_state.min_vals[idx] = 0.0
+    return callback
+
+def make_min_callback(idx, current_d, target_time):
+    def callback():
+        val = st.session_state[f"min_{idx}"]
+        st.session_state.last_edited[idx] = 'min'
+        st.session_state.min_vals[idx] = val
+        if val > 0:
+            st.session_state.tyre_vals[idx] = round((val * current_d) / target_time, 2)
+        else:
+            st.session_state.tyre_vals[idx] = 0.0
+    return callback
+
+# Render rows dynamically with 2-way session state sync
 for idx, row in df.iterrows():
     gt_code = str(row['GT Code']) if pd.notna(row['GT Code']) else ""
     tyre_size = str(row['Tyre size'])
@@ -56,20 +87,24 @@ for idx, row in df.iterrows():
     t_key = f"tyre_{idx}"
     m_key = f"min_{idx}"
     
-    tyre_val = rcol4.number_input("", min_value=0.0, value=0.0, step=None, key=t_key, label_visibility="collapsed")
-    min_val = rcol5.number_input("", min_value=0.0, value=0.0, step=None, key=m_key, label_visibility="collapsed")
+    # Ensure session state values match current multiplier/target changes
+    if st.session_state.last_edited.get(idx) == 'tyre':
+        t_val = st.session_state.tyre_vals.get(idx, 0.0)
+        m_val = round((target_time / current_d) * t_val, 2) if t_val > 0 else 0.0
+        st.session_state.min_vals[idx] = m_val
+    else:
+        m_val = st.session_state.min_vals.get(idx, 0.0)
+        t_val = round((m_val * current_d) / target_time, 2) if m_val > 0 else 0.0
+        st.session_state.tyre_vals[idx] = t_val
+
+    # Widget inputs bound with callbacks
+    rcol4.number_input("", min_value=0.0, value=st.session_state.tyre_vals[idx], step=None, key=t_key, 
+                       label_visibility="collapsed", on_change=make_tyre_callback(idx, current_d, target_time))
+    rcol5.number_input("", min_value=0.0, value=st.session_state.min_vals[idx], step=None, key=m_key, 
+                       label_visibility="collapsed", on_change=make_min_callback(idx, current_d, target_time))
     
-    # Calculation logic
-    if tyre_val > 0:
-        t = float(tyre_val)
-        total_tyres += t
-        m = round((target_time / current_d) * t, 2)
-        total_mins += m
-    elif min_val > 0:
-        m = float(min_val)
-        total_mins += m
-        t = round((m * current_d) / target_time, 2)
-        total_tyres += t
+    total_tyres += st.session_state.tyre_vals[idx]
+    total_mins += st.session_state.min_vals[idx]
 
 # Live Summary Panel
 st.markdown("---")
