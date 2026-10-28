@@ -21,9 +21,9 @@ except Exception as e:
 # Initialize Session State values for rows if not already present
 for idx in range(len(df)):
     if f"t_{idx}" not in st.session_state:
-        st.session_state[f"t_{idx}"] = 0.0
+        st.session_state[f"t_{idx}"] = ""
     if f"m_{idx}" not in st.session_state:
-        st.session_state[f"m_{idx}"] = 0.0
+        st.session_state[f"m_{idx}"] = ""
 
 # Top Control Panel & Summary Display Container
 top_container = st.container()
@@ -38,20 +38,30 @@ with top_container:
     target_time = 450.0 if builder_mode == "1 Builder" else 480.0
     header_d_label = "1 Builder (D)" if builder_mode == "1 Builder" else "2 Builder (D)"
 
-# Callbacks for 2-way live sync
+# Callbacks for 2-way live sync using text inputs
 def update_from_tyre(idx, current_d, target_time):
-    t = st.session_state[f"t_{idx}"]
-    if t > 0:
-        st.session_state[f"m_{idx}"] = round((target_time / current_d) * t, 2)
-    else:
-        st.session_state[f"m_{idx}"] = 0.0
+    val = st.session_state[f"t_{idx}"].strip()
+    try:
+        if val != "":
+            t = float(val)
+            m = round((target_time / current_d) * t, 2)
+            st.session_state[f"m_{idx}"] = str(m)
+        else:
+            st.session_state[f"m_{idx}"] = ""
+    except ValueError:
+        pass
 
 def update_from_min(idx, current_d, target_time):
-    m = st.session_state[f"m_{idx}"]
-    if m > 0:
-        st.session_state[f"t_{idx}"] = round((m * current_d) / target_time, 2)
-    else:
-        st.session_state[f"t_{idx}"] = 0.0
+    val = st.session_state[f"m_{idx}"].strip()
+    try:
+        if val != "":
+            m = float(val)
+            t = round((m * current_d) / target_time, 2)
+            st.session_state[f"t_{idx}"] = str(t)
+        else:
+            st.session_state[f"t_{idx}"] = ""
+    except ValueError:
+        pass
 
 st.markdown("---")
 
@@ -82,20 +92,30 @@ for idx, row in df.iterrows():
     t_key = f"t_{idx}"
     m_key = f"m_{idx}"
     
-    # Number inputs with event callbacks
-    rcol4.number_input("", min_value=0.0, step=None, key=t_key, label_visibility="collapsed",
-                       on_change=update_from_tyre, args=(idx, current_d, target_time))
-    rcol5.number_input("", min_value=0.0, step=None, key=m_key, label_visibility="collapsed",
-                       on_change=update_from_min, args=(idx, current_d, target_time))
+    # Clean text inputs without +/- buttons
+    rcol4.text_input("", key=t_key, label_visibility="collapsed",
+                     on_change=update_from_tyre, args=(idx, current_d, target_time))
+    rcol5.text_input("", key=m_key, label_visibility="collapsed",
+                     on_change=update_from_min, args=(idx, current_d, target_time))
     
-    total_tyres += st.session_state[t_key]
-    total_mins += st.session_state[m_key]
+    # Calculate running totals safely
+    try:
+        if st.session_state[t_key].strip() != "":
+            total_tyres += float(st.session_state[t_key])
+    except ValueError:
+        pass
+        
+    try:
+        if st.session_state[m_key].strip() != "":
+            total_mins += float(st.session_state[m_key])
+    except ValueError:
+        pass
 
-# Render summary stats dynamically back into the top control panel columns
+# Render summary stats dynamically into the top control panel columns
 diff_val = target_time - total_mins
 with col_t:
     st.metric("Total Tyres", f"{total_tyres:.2f}")
 with col_m:
     st.metric("Total Mins", f"{total_mins:.2f}")
 with col_diff:
-    st.markdown(f"<p style='font-size:16 font-weight:bold; color:red; padding-top:20px;'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight:bold; color:red; padding-top:20px;'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</p>", unsafe_allow_html=True)
