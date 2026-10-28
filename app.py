@@ -56,7 +56,6 @@ for idx, row in df.iterrows():
     t_key = f"tyre_{idx}"
     m_key = f"min_{idx}"
     
-    # Using number_input with step=None to look clean and update instantly
     tyre_val = rcol4.number_input("", min_value=0.0, value=0.0, step=None, key=t_key, label_visibility="collapsed")
     min_val = rcol5.number_input("", min_value=0.0, value=0.0, step=None, key=m_key, label_visibility="collapsed")
     
@@ -72,10 +71,10 @@ for idx, row in df.iterrows():
         t = round((m * current_d) / target_time, 2)
         total_tyres += t
 
-# Live Summary Panel at Top / Bottom
+# Live Summary Panel
 st.markdown("---")
 diff_val = target_time - total_mins
 summary_cols = st.columns(3)
 summary_cols[0].metric("Total Tyres Made", f"{total_tyres:.2f}")
-summary_cols[1].metric("Total Minutes", f"{total_mins.2f}")
+summary_cols[1].metric("Total Minutes", f"{total_mins:.2f}")
 summary_cols[2].markdown(f"### Target Diff: <span style='color:red'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</span>", unsafe_allow_html=True)
