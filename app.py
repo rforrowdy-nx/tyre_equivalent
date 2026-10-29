@@ -1,7 +1,28 @@
 import streamlit as st
 import pandas as pd
 
+# Set page config with mobile responsiveness enabled
 st.set_page_config(page_title="Tyre Equivalent Production Calculator", layout="wide")
+
+# Custom CSS to make inputs, text, and tables look great on mobile screens
+st.markdown("""
+    <style>
+    /* Reduce top padding for mobile screens */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    /* Make metrics and headers responsive */
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 22px !important;
+        }
+        .stMetric {
+            font-size: 14px !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("Tyre Production & Time Calculator")
 
@@ -28,14 +49,13 @@ for _, row in df.iterrows():
         'd_base': float(row['2 Builder'])
     }
 
-# Sort the GT codes in alphabetical/ascending order
 gt_list = sorted(list(gt_mapping.keys()))
 
 # Row management state
 if 'row_count' not in st.session_state:
     st.session_state.row_count = 1
 
-# Top Control & Summary Panel
+# Top Control & Summary Panel (Adaptive columns for mobile)
 top_container = st.container()
 
 with top_container:
@@ -50,25 +70,25 @@ with top_container:
 
     with col_add:
         st.write("")
-        if st.button("➕ Add Row"):
+        if st.button("➕ Add"):
             st.session_state.row_count += 1
             st.rerun()
 
     with col_del:
         st.write("")
-        if st.button("🗑️ Delete Row") and st.session_state.row_count > 1:
+        if st.button("🗑️ Del") and st.session_state.row_count > 1:
             st.session_state.row_count -= 1
             st.rerun()
 
 st.markdown("---")
 
-# Table Headers
-hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([2, 4, 2, 2, 2])
-hcol1.markdown("**GT Code (Combo)**")
+# Table Headers (Hidden on extremely small screens or streamlined)
+hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([2, 3, 1.5, 2, 2])
+hcol1.markdown("**GT Code**")
 hcol2.markdown("**Tyre Size**")
 hcol3.markdown(f"**{header_d_label}**")
-hcol4.markdown("**No. of Tyres (E)**")
-hcol5.markdown("**Time (Minutes) (F)**")
+hcol4.markdown("**Tyres (E)**")
+hcol5.markdown("**Mins (F)**")
 
 # Callbacks for 2-way live sync
 def tyre_changed(i, current_d, target_time):
@@ -107,7 +127,7 @@ for i in range(st.session_state.row_count):
     if f"gt_{i}" not in st.session_state:
         st.session_state[f"gt_{i}"] = gt_list[0] if gt_list else ""
 
-    rcol1, rcol2, rcol3, rcol4, rcol5 = st.columns([2, 4, 2, 2, 2])
+    rcol1, rcol2, rcol3, rcol4, rcol5 = st.columns([2, 3, 1.5, 2, 2])
     
     selected_gt = rcol1.selectbox("", gt_list, key=f"gt_{i}", label_visibility="collapsed")
     
@@ -133,4 +153,4 @@ with col_t:
 with col_m:
     st.metric("Total Mins", f"{total_mins:.2f}")
 with col_diff:
-    st.markdown(f"<p style='font-weight:bold; color:red; padding-top:20px;'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight:bold; color:red; padding-top:20px; font-size:14px;'>({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</p>", unsafe_allow_html=True)
