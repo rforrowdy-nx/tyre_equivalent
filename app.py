@@ -18,7 +18,7 @@ except Exception as e:
     st.error(f"Error loading Excel file (Make sure 'Tyre Equalent Formula.xlsx' is uploaded to GitHub): {e}")
     st.stop()
 
-# Create GT Code mapping
+# Create GT Code mapping and sort alphabetically
 df['GT Code_str'] = df['GT Code'].astype(str)
 gt_mapping = {}
 for _, row in df.iterrows():
@@ -27,7 +27,9 @@ for _, row in df.iterrows():
         'size': str(row['Tyre size']),
         'd_base': float(row['2 Builder'])
     }
-gt_list = list(gt_mapping.keys())
+
+# Sort the GT codes in alphabetical/ascending order
+gt_list = sorted(list(gt_mapping.keys()))
 
 # Row management state
 if 'row_count' not in st.session_state:
