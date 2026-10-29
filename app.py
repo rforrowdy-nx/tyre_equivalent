@@ -18,18 +18,27 @@ except Exception as e:
     st.error(f"Error loading Excel file (Make sure 'Tyre Equalent Formula.xlsx' is uploaded to GitHub): {e}")
     st.stop()
 
-# Initialize Session State values for rows if not already present
-for idx in range(len(df)):
-    if f"t_{idx}" not in st.session_state:
-        st.session_state[f"t_{idx}"] = ""
-    if f"m_{idx}" not in st.session_state:
-        st.session_state[f"m_{idx}"] = ""
+# Create a mapping dictionary for fast lookup based on GT Code
+df['GT Code_str'] = df['GT Code'].astype(str)
+gt_mapping = {}
+for _, row in df.iterrows():
+    gt = str(row['GT Code']) if pd.notna(row['GT Code']) else "N/A"
+    gt_mapping[gt] = {
+        'size': str(row['Tyre size']),
+        'd_base': float(row['2 Builder'])
+    }
 
-# Top Control Panel & Summary Display Container
+gt_list = list(gt_mapping.keys())
+
+# Initialize rows state
+if 'rows' not in st.session_state:
+    st.session_state.rows = [{'gt': gt_list[0] if gt_list else "", 'tyre': "", 'min': ""}]
+
+# Top Control & Summary Panel
 top_container = st.container()
 
 with top_container:
-    control_col1, separator, col_t, col_m, col_diff = st.columns([2, 0.5, 2, 2, 3])
+    control_col1, col_add, col_del, col_t, col_m, col_diff = st.columns([2, 1, 1, 2, 2, 3])
     
     with control_col1:
         builder_mode = st.selectbox("Builder Mode", ["2 Builder", "1 Builder"])
@@ -38,36 +47,23 @@ with top_container:
     target_time = 450.0 if builder_mode == "1 Builder" else 480.0
     header_d_label = "1 Builder (D)" if builder_mode == "1 Builder" else "2 Builder (D)"
 
-# Callbacks for 2-way live sync using text inputs
-def update_from_tyre(idx, current_d, target_time):
-    val = st.session_state[f"t_{idx}"].strip()
-    try:
-        if val != "":
-            t = float(val)
-            m = round((target_time / current_d) * t, 2)
-            st.session_state[f"m_{idx}"] = str(m)
-        else:
-            st.session_state[f"m_{idx}"] = ""
-    except ValueError:
-        pass
+    with col_add:
+        st.write("")
+        if st.button("➕ Add Row"):
+            st.session_state.rows.append({'gt': gt_list[0] if gt_list else "", 'tyre': "", 'min': ""})
+            st.rerun()
 
-def update_from_min(idx, current_d, target_time):
-    val = st.session_state[f"m_{idx}"].strip()
-    try:
-        if val != "":
-            m = float(val)
-            t = round((m * current_d) / target_time, 2)
-            st.session_state[f"t_{idx}"] = str(t)
-        else:
-            st.session_state[f"t_{idx}"] = ""
-    except ValueError:
-        pass
+    with col_del:
+        st.write("")
+        if st.button("🗑️ Delete Last") and len(st.session_state.rows) > 1:
+            st.session_state.rows.pop()
+            st.rerun()
 
 st.markdown("---")
 
 # Table Headers
-hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([1.5, 4, 2, 2, 2])
-hcol1.markdown("**GT Code**")
+hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([2, 4, 2, 2, 2])
+hcol1.markdown("**GT Code (Combo)**")
 hcol2.markdown("**Tyre Size**")
 hcol3.markdown(f"**{header_d_label}**")
 hcol4.markdown("**No. of Tyres (E)**")
@@ -76,42 +72,69 @@ hcol5.markdown("**Time (Minutes) (F)**")
 total_tyres = 0.0
 total_mins = 0.0
 
-# Render rows dynamically
-for idx, row in df.iterrows():
-    gt_code = str(row['GT Code']) if pd.notna(row['GT Code']) else ""
-    tyre_size = str(row['Tyre size'])
-    d_base = float(row['2 Builder'])
-    current_d = d_base * multiplier
+# Render dynamic rows
+for i, row_data in enumerate(st.session_state.rows):
+    rcol1, rcol2, rcol3, rcol4, rcol5 = st.columns([2, 4, 2, 2, 2])
     
-    rcol1, rcol2, rcol3, rcol4, rcol5 = st.columns([1.5, 4, 2, 2, 2])
+    # GT Code Combox selection
+    selected_gt = rcol1.selectbox("", gt_list, index=gt_list.index(row_data['gt']) if row_data['gt'] in gt_list else 0, key=f"gt_{i}", label_visibility="collapsed")
+    st.session_state.rows[i]['gt'] = selected_gt
     
-    rcol1.write(gt_code)
-    rcol2.write(tyre_size)
+    # Lookup details from dictionary
+    details = gt_mapping.get(selected_gt, {'size': '', 'd_base': 0.0})
+    current_d = details['d_base'] * multiplier
+    
+    rcol2.write(details['size'])
     rcol3.write(f"{current_d:.2f}")
     
-    t_key = f"t_{idx}"
-    m_key = f"m_{idx}"
+    # Text input values
+    current_tyre_val = row_data['tyre']
+    current_min_val = row_data['min']
     
-    # Clean text inputs without +/- buttons
-    rcol4.text_input("", key=t_key, label_visibility="collapsed",
-                     on_change=update_from_tyre, args=(idx, current_d, target_time))
-    rcol5.text_input("", key=m_key, label_visibility="collapsed",
-                     on_change=update_from_min, args=(idx, current_d, target_time))
+    t_input = rcol4.text_input("", value=current_tyre_val, key=f"t_{i}", label_visibility="collapsed")
+    m_input = rcol5.text_input("", value=current_min_val, key=f"m_{i}", label_visibility="collapsed")
     
-    # Calculate running totals safely
+    # Handle Live 2-way Calculations & State tracking
+    if t_input != current_tyre_val:
+        st.session_state.rows[i]['tyre'] = t_input
+        try:
+            if t_input.strip() != "":
+                t_num = float(t_input)
+                m_num = round((target_time / current_d) * t_num, 2)
+                st.session_state.rows[i]['min'] = str(m_num)
+            else:
+                st.session_state.rows[i]['min'] = ""
+        except ValueError:
+            pass
+        st.rerun()
+
+    elif m_input != current_min_val:
+        st.session_state.rows[i]['min'] = m_input
+        try:
+            if m_input.strip() != "":
+                m_num = float(m_input)
+                t_num = round((m_num * current_d) / target_time, 2)
+                st.session_state.rows[i]['tyre'] = str(t_num)
+            else:
+                st.session_state.rows[i]['tyre'] = ""
+        except ValueError:
+            pass
+        st.rerun()
+
+    # Accumulate totals
     try:
-        if st.session_state[t_key].strip() != "":
-            total_tyres += float(st.session_state[t_key])
+        if st.session_state.rows[i]['tyre'].strip() != "":
+            total_tyres += float(st.session_state.rows[i]['tyre'])
     except ValueError:
         pass
         
     try:
-        if st.session_state[m_key].strip() != "":
-            total_mins += float(st.session_state[m_key])
+        if st.session_state.rows[i]['min'].strip() != "":
+            total_mins += float(st.session_state.rows[i]['min'])
     except ValueError:
         pass
 
-# Render summary stats dynamically into the top control panel columns
+# Render summary stats into top panel columns
 diff_val = target_time - total_mins
 with col_t:
     st.metric("Total Tyres", f"{total_tyres:.2f}")
