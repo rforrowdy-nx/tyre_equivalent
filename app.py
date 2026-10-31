@@ -35,17 +35,24 @@ except Exception as e:
     st.error(f"Error loading Excel file: {e}")
     st.stop()
 
-# Combine GT Code & Tyre Size for the combobox and sort alphabetically
+# Build combobox mapping using the 1st, 2nd, and 3rd columns
 gt_mapping = {}
 for _, row in df.iterrows():
-    gt = str(row['GT Code']) if pd.notna(row['GT Code']) else "N/A"
-    size = str(row['Tyre size']) if pd.notna(row['Tyre size']) else ""
-    d_base = float(row['2 Builder'])
+    gt = str(row.iloc[0]) if pd.notna(row.iloc[0]) else "N/A"
+    size = str(row.iloc[1]) if pd.notna(row.iloc[1]) else ""
+    construction = str(row.iloc[2]) if len(row) > 2 and pd.notna(row.iloc[2]) else ""
     
-    display_label = f"{gt} — {size}"
+    d_base = float(row['2 Builder']) if '2 Builder' in df.columns and pd.notna(row['2 Builder']) else 0.0
+    
+    if construction:
+        display_label = f"{gt} — {size} — {construction}"
+    else:
+        display_label = f"{gt} — {size}"
+        
     gt_mapping[display_label] = {
         'gt': gt,
         'size': size,
+        'construction': construction,
         'd_base': d_base
     }
 
@@ -99,6 +106,18 @@ def min_changed(i, current_d, target_time):
     except (ValueError, TypeError):
         st.session_state[tyre_key] = 0.0
 
+# Callback when combobox selection changes to reset or recalculate properly
+def combo_changed(i, current_d, target_time):
+    # If there is an existing tyre value, recalculate minutes for the new tyre
+    t_key = f"t_{i}"
+    min_key = f"m_{i}"
+    try:
+        val = float(st.session_state[t_key])
+        if val > 0:
+            st.session_state[min_key] = round((target_time / current_d) * val, 2)
+    except (ValueError, TypeError):
+        pass
+
 total_tyres = 0.0
 total_mins = 0.0
 
@@ -114,10 +133,22 @@ for i in range(st.session_state.row_count):
     with st.container():
         st.markdown(f"<div class='row-card'>", unsafe_allow_html=True)
         
-        # Combined Combobox with GT Code and Tyre Size
-        selected_label = st.selectbox(f"Select Tyre (Item {i+1})", gt_list, key=f"gt_{i}")
+        # Get current selected label before rendering selectbox
+        prev_gt = st.session_state.get(f"gt_{i}", gt_list[0] if gt_list else "")
         
-        details = gt_mapping.get(selected_label, {'gt': '', 'size': '', 'd_base': 0.0})
+        details_temp = gt_mapping.get(prev_gt, {'d_base': gt_list[0] and gt_mapping[gt_list[0]]['d_base'] or 0.0})
+        curr_d_temp = details_temp['d_base'] * multiplier
+
+        # Combobox with on_change trigger
+        selected_label = st.selectbox(
+            f"Select Tyre (Item {i+1})", 
+            gt_list, 
+            key=f"gt_{i}", 
+            on_change=combo_changed, 
+            args=(i, curr_d_temp, target_time)
+        )
+        
+        details = gt_mapping.get(selected_label, {'gt': '', 'size': '', 'construction': '', 'd_base': 0.0})
         current_d = details['d_base'] * multiplier
         
         st.markdown(f"**Equivalent ({header_d_label}):** `{current_d:.2f}`")
