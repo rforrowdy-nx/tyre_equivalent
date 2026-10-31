@@ -44,7 +44,6 @@ for _, row in df.iterrows():
     
     d_base = float(row['2 Builder']) if '2 Builder' in df.columns and pd.notna(row['2 Builder']) else 0.0
     
-    # Format with construction method inside brackets
     if construction:
         display_label = f"{gt} — {size} ({construction})"
     else:
@@ -157,8 +156,16 @@ for i in range(st.session_state.row_count):
         
         st.markdown(f"</div>", unsafe_allow_html=True)
 
-    total_tyres += float(st.session_state[f"t_{i}"])
-    total_mins += float(st.session_state[f"m_{i}"])
+    # Only add to totals if values are greater than zero
+    try:
+        t_val = float(st.session_state[f"t_{i}"])
+        m_val = float(st.session_state[f"m_{i}"])
+        if t_val > 0:
+            total_tyres += t_val
+        if m_val > 0:
+            total_mins += m_val
+    except (ValueError, TypeError):
+        pass
 
 # Summary Section at the Bottom
 st.markdown("---")
