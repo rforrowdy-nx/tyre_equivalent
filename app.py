@@ -179,7 +179,7 @@ s_col2.metric("Total Mins", f"{total_mins:.2f}")
 # Format the target diff string with individual row breakdown
 if active_mins_list:
     mins_breakdown = " + ".join(active_mins_list)
-    formula_display = f"({target_time:.0f} - [{mins_breakdown}] = {total_mins:.2f} = {diff_val:.2f})"
+    formula_display = f"({target_time:.0f} - [{mins_breakdown}] -> {total_mins:.2f} = {diff_val:.2f})"
 else:
     formula_display = f"({target_time:.0f} - 0.00 = {target_time:.2f})"
 
