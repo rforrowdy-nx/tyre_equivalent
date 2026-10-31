@@ -35,15 +35,20 @@ except Exception as e:
     st.error(f"Error loading Excel file: {e}")
     st.stop()
 
-# GT Mapping & Sorting alphabetically
-df['GT Code_str'] = df['GT Code'].astype(str)
+# Combine GT Code & Tyre Size for the combobox and sort alphabetically
 gt_mapping = {}
 for _, row in df.iterrows():
     gt = str(row['GT Code']) if pd.notna(row['GT Code']) else "N/A"
-    gt_mapping[gt] = {
-        'size': str(row['Tyre size']),
-        'd_base': float(row['2 Builder'])
+    size = str(row['Tyre size']) if pd.notna(row['Tyre size']) else ""
+    d_base = float(row['2 Builder'])
+    
+    display_label = f"{gt} — {size}"
+    gt_mapping[display_label] = {
+        'gt': gt,
+        'size': size,
+        'd_base': d_base
     }
+
 gt_list = sorted(list(gt_mapping.keys()))
 
 if 'row_count' not in st.session_state:
@@ -109,13 +114,13 @@ for i in range(st.session_state.row_count):
     with st.container():
         st.markdown(f"<div class='row-card'>", unsafe_allow_html=True)
         
-        selected_gt = st.selectbox(f"GT Code (Item {i+1})", gt_list, key=f"gt_{i}")
+        # Combined Combobox with GT Code and Tyre Size
+        selected_label = st.selectbox(f"Select Tyre (Item {i+1})", gt_list, key=f"gt_{i}")
         
-        details = gt_mapping.get(selected_gt, {'size': '', 'd_base': 0.0})
+        details = gt_mapping.get(selected_label, {'gt': '', 'size': '', 'd_base': 0.0})
         current_d = details['d_base'] * multiplier
         
-        st.markdown(f"**Tyre Size:** {details['size']}")
-        st.markdown(f"**{header_d_label}:** `{current_d:.2f}`")
+        st.markdown(f"**Equivalent ({header_d_label}):** `{current_d:.2f}`")
         
         # Side-by-side inputs for Tyres and Minutes inside the card
         ic1, ic2 = st.columns(2)
