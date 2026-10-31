@@ -35,7 +35,7 @@ except Exception as e:
     st.error(f"Error loading Excel file: {e}")
     st.stop()
 
-# Build combobox mapping using the 1st, 2nd, and 3rd columns
+# Build combobox mapping with construction method inside brackets
 gt_mapping = {}
 for _, row in df.iterrows():
     gt = str(row.iloc[0]) if pd.notna(row.iloc[0]) else "N/A"
@@ -44,8 +44,9 @@ for _, row in df.iterrows():
     
     d_base = float(row['2 Builder']) if '2 Builder' in df.columns and pd.notna(row['2 Builder']) else 0.0
     
+    # Format with construction method inside brackets
     if construction:
-        display_label = f"{gt} — {size} — {construction}"
+        display_label = f"{gt} — {size} ({construction})"
     else:
         display_label = f"{gt} — {size}"
         
@@ -106,9 +107,7 @@ def min_changed(i, current_d, target_time):
     except (ValueError, TypeError):
         st.session_state[tyre_key] = 0.0
 
-# Callback when combobox selection changes to reset or recalculate properly
 def combo_changed(i, current_d, target_time):
-    # If there is an existing tyre value, recalculate minutes for the new tyre
     t_key = f"t_{i}"
     min_key = f"m_{i}"
     try:
@@ -133,13 +132,10 @@ for i in range(st.session_state.row_count):
     with st.container():
         st.markdown(f"<div class='row-card'>", unsafe_allow_html=True)
         
-        # Get current selected label before rendering selectbox
         prev_gt = st.session_state.get(f"gt_{i}", gt_list[0] if gt_list else "")
-        
         details_temp = gt_mapping.get(prev_gt, {'d_base': gt_list[0] and gt_mapping[gt_list[0]]['d_base'] or 0.0})
         curr_d_temp = details_temp['d_base'] * multiplier
 
-        # Combobox with on_change trigger
         selected_label = st.selectbox(
             f"Select Tyre (Item {i+1})", 
             gt_list, 
@@ -153,7 +149,6 @@ for i in range(st.session_state.row_count):
         
         st.markdown(f"**Equivalent ({header_d_label}):** `{current_d:.2f}`")
         
-        # Side-by-side inputs for Tyres and Minutes inside the card
         ic1, ic2 = st.columns(2)
         with ic1:
             st.number_input("No. of Tyres (E)", min_value=0.0, step=None, key=f"t_{i}", on_change=tyre_changed, args=(i, current_d, target_time))
