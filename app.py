@@ -118,6 +118,7 @@ def combo_changed(i, current_d, target_time):
 
 total_tyres = 0.0
 total_mins = 0.0
+active_mins_list = []
 
 # Render Card-based rows optimized for mobile screens
 for i in range(st.session_state.row_count):
@@ -156,14 +157,14 @@ for i in range(st.session_state.row_count):
         
         st.markdown(f"</div>", unsafe_allow_html=True)
 
-    # Only add to totals if values are greater than zero
+    # Accumulate totals and collect individual row minutes
     try:
         t_val = float(st.session_state[f"t_{i}"])
         m_val = float(st.session_state[f"m_{i}"])
-        if t_val > 0:
+        if t_val > 0 and m_val > 0:
             total_tyres += t_val
-        if m_val > 0:
             total_mins += m_val
+            active_mins_list.append(f"{m_val:.2f}")
     except (ValueError, TypeError):
         pass
 
@@ -174,4 +175,12 @@ st.subheader("📊 Summary Panel")
 s_col1, s_col2 = st.columns(2)
 s_col1.metric("Total Tyres", f"{total_tyres:.2f}")
 s_col2.metric("Total Mins", f"{total_mins:.2f}")
-st.markdown(f"<h4 style='text-align: center; color: red;'>Target Diff: ({target_time:.0f} - {total_mins:.2f} = {diff_val:.2f})</h4>", unsafe_allow_html=True)
+
+# Format the target diff string with individual row breakdown
+if active_mins_list:
+    mins_breakdown = " + ".join(active_mins_list)
+    formula_display = f"({target_time:.0f} - [{mins_breakdown}] = {total_mins:.2f} = {diff_val:.2f})"
+else:
+    formula_display = f"({target_time:.0f} - 0.00 = {target_time:.2f})"
+
+st.markdown(f"<h4 style='text-align: center; color: red;'>Target Diff: {formula_display}</h4>", unsafe_allow_html=True)
