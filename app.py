@@ -41,6 +41,9 @@ except Exception as e:
 if "row_count" not in st.session_state:
     st.session_state.row_count = 1
 
+if "last_applied_row_key" not in st.session_state:
+    st.session_state.last_applied_row_key = None
+
 # Builder Mode & Row Controls
 col_mode, col_add, col_del, col_reload = st.columns([2, 1, 1, 1.2])
 
@@ -87,6 +90,7 @@ for _, row in df.iterrows():
         "construction": construction,
         "d_base": d_base,
         "current_d": current_d,
+        "label": display_label,
     }
     master_records.append(
         {
@@ -94,11 +98,14 @@ for _, row in df.iterrows():
             "Tyre Size": size,
             "Construction": construction,
             header_d_label: round(current_d, 2),
+            "_combo_label": display_label,
         }
     )
 
 gt_list = sorted(list(gt_mapping.keys()), key=lambda s: s.lower())
-master_df = pd.DataFrame(master_records).sort_values(by="GT Code", key=lambda col: col.astype(str).str.lower())
+master_df = pd.DataFrame(master_records).sort_values(
+    by="GT Code", key=lambda col: col.astype(str).str.lower()
+).reset_index(drop=True)
 
 st.markdown("---")
 
@@ -142,6 +149,54 @@ def combo_changed(i, current_d, target_time):
 
 # Main Layout: Left = Calculation Cards, Right = Full Tyre Reference List
 left_col, right_col = st.columns([1.35, 1])
+
+with right_col:
+    st.subheader("📋 All Tyre Details")
+    search_query = st.text_input("Search GT Code, Size, or Construction", placeholder="Type to filter...")
+    filtered_df = master_df
+    if search_query.strip():
+        q = search_query.strip().lower()
+        mask = master_df.apply(lambda r: q in " ".join(r.astype(str)).lower(), axis=1)
+        filtered_df = master_df[mask].reset_index(drop=True)
+
+    row_options = [f"Item {idx + 1}" for idx in range(st.session_state.row_count)]
+    default_target_idx = st.session_state.row_count - 1
+    target_row_label = st.selectbox(
+        "Send selected tyre to Entry Row (defaults to last row):",
+        row_options,
+        index=default_target_idx,
+        key="target_entry_row",
+    )
+    target_row_idx = row_options.index(target_row_label)
+
+    display_cols = ["GT Code", "Tyre Size", "Construction", header_d_label]
+    event = st.dataframe(
+        filtered_df[display_cols],
+        use_container_width=True,
+        hide_index=True,
+        height=390,
+        key="master_tyre_table",
+        on_select="rerun",
+        selection_mode="single-row",
+    )
+
+    selected_rows = event.selection.rows if event and event.selection else []
+    if selected_rows:
+        chosen_pos = selected_rows[0]
+        if 0 <= chosen_pos < len(filtered_df):
+            chosen_combo_label = filtered_df.loc[chosen_pos, "_combo_label"]
+            apply_token = f"{target_row_idx}:{chosen_combo_label}"
+            if st.session_state.last_applied_row_key != apply_token:
+                st.session_state.last_applied_row_key = apply_token
+                st.session_state[f"gt_{target_row_idx}"] = chosen_combo_label
+                new_d = gt_mapping.get(chosen_combo_label, {"current_d": 0.0})["current_d"]
+                try:
+                    existing_t = float(st.session_state.get(f"t_{target_row_idx}", 0.0))
+                    if existing_t > 0 and new_d > 0:
+                        st.session_state[f"m_{target_row_idx}"] = round((target_time / new_d) * existing_t, 2)
+                except (ValueError, TypeError):
+                    pass
+                st.rerun()
 
 total_tyres = 0.0
 total_mins = 0.0
@@ -204,17 +259,6 @@ with left_col:
                 active_mins_list.append(f"{m_val:.2f}")
         except (ValueError, TypeError):
             pass
-
-with right_col:
-    st.subheader("📋 All Tyre Details")
-    search_query = st.text_input("Search GT Code, Size, or Construction", placeholder="Type to filter...")
-    filtered_df = master_df
-    if search_query.strip():
-        q = search_query.strip().lower()
-        mask = master_df.apply(lambda r: q in " ".join(r.astype(str)).lower(), axis=1)
-        filtered_df = master_df[mask]
-
-    st.dataframe(filtered_df, use_container_width=True, hide_index=True, height=420)
 
 # Summary Section at the Bottom
 st.markdown("---")
