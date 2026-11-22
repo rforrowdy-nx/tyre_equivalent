@@ -41,8 +41,23 @@ except Exception as e:
 if "row_count" not in st.session_state:
     st.session_state.row_count = 1
 
+if "target_entry_row" not in st.session_state:
+    st.session_state.target_entry_row = f"Item {st.session_state.row_count}"
+
 if "last_applied_row_key" not in st.session_state:
     st.session_state.last_applied_row_key = None
+
+
+def add_new_row():
+    st.session_state.row_count += 1
+    st.session_state.target_entry_row = f"Item {st.session_state.row_count}"
+
+
+def delete_last_row():
+    if st.session_state.row_count > 1:
+        st.session_state.row_count -= 1
+        st.session_state.target_entry_row = f"Item {st.session_state.row_count}"
+
 
 # Builder Mode & Row Controls
 col_mode, col_add, col_del, col_reload = st.columns([2, 1, 1, 1.2])
@@ -56,15 +71,11 @@ header_d_label = "1 Builder (D)" if builder_mode == "1 Builder" else "2 Builder 
 
 with col_add:
     st.write("")
-    if st.button("➕ Add Row", use_container_width=True):
-        st.session_state.row_count += 1
-        st.rerun()
+    st.button("➕ Add Row", use_container_width=True, on_click=add_new_row)
 
 with col_del:
     st.write("")
-    if st.button("🗑️ Delete Row", use_container_width=True) and st.session_state.row_count > 1:
-        st.session_state.row_count -= 1
-        st.rerun()
+    st.button("🗑️ Delete Row", use_container_width=True, on_click=delete_last_row)
 
 with col_reload:
     st.write("")
@@ -103,9 +114,11 @@ for _, row in df.iterrows():
     )
 
 gt_list = sorted(list(gt_mapping.keys()), key=lambda s: s.lower())
-master_df = pd.DataFrame(master_records).sort_values(
-    by="GT Code", key=lambda col: col.astype(str).str.lower()
-).reset_index(drop=True)
+master_df = (
+    pd.DataFrame(master_records)
+    .sort_values(by="GT Code", key=lambda col: col.astype(str).str.lower())
+    .reset_index(drop=True)
+)
 
 st.markdown("---")
 
@@ -160,11 +173,12 @@ with right_col:
         filtered_df = master_df[mask].reset_index(drop=True)
 
     row_options = [f"Item {idx + 1}" for idx in range(st.session_state.row_count)]
-    default_target_idx = st.session_state.row_count - 1
+    if st.session_state.target_entry_row not in row_options:
+        st.session_state.target_entry_row = row_options[-1]
+
     target_row_label = st.selectbox(
-        "Send selected tyre to Entry Row (defaults to last row):",
+        "Send selected tyre to Entry Row:",
         row_options,
-        index=default_target_idx,
         key="target_entry_row",
     )
     target_row_idx = row_options.index(target_row_label)
