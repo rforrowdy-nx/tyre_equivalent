@@ -17,6 +17,12 @@ st.markdown(
         border-radius: 12px;
         margin-bottom: 14px;
     }
+    .equiv-display {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #22c55e;
+        margin: 4px 0 10px 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -241,7 +247,10 @@ with left_col:
         details = gt_mapping.get(selected_label, {"gt": "", "size": "", "construction": "", "current_d": 0.0})
         current_d = details["current_d"]
 
-        st.markdown(f"**{header_d_label}:** `{current_d:.2f}`")
+        st.markdown(
+            f"<div class='equiv-display'>{header_d_label}: {current_d:.2f}</div>",
+            unsafe_allow_html=True,
+        )
 
         ic1, ic2 = st.columns(2)
         with ic1:
